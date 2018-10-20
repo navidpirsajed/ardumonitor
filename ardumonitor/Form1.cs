@@ -10,6 +10,7 @@ using System.Windows.Forms;
 using System.IO.Ports;
 using System.IO;
 using System.Threading;
+using System.Diagnostics;
 using OpenHardwareMonitor.Hardware;
 using System.Text.RegularExpressions;
 
@@ -23,7 +24,11 @@ namespace ardumonitor
         String storedPort;
         string selectedbaudRate;
         string storedbaudRate;
+        public string selected_gputemp { get; set; }
+        
+        public string stored_gputemp = "false";
         bool running = false;
+        Settings sett = new Settings();
         public Form1()
         {
             InitializeComponent();
@@ -53,41 +58,50 @@ namespace ardumonitor
                 {
                     sw.Write("Port: ");
                     sw.WriteLine("COM");
-                    sw.Write("Baud Rate: ");
+                    sw.Write("Baud_Rate: ");
                     sw.WriteLine("9600");
+                    sw.Write("GPU_Temperature_Enabled: ");
+                    sw.WriteLine("false");
                 }
             }
             else
             {
                 string lines = System.IO.File.ReadAllText(@"config.txt");
                 string[] line = lines.Split(new char[] { ':', ' ', '\r', '\n'}, StringSplitOptions.RemoveEmptyEntries);
-                try
-                {
+                /*try
+                {*/
+                    int testaaa = 0;
+                    foreach(var a in line)
+                    {
+                        Console.WriteLine(line[testaaa]);
+                        testaaa++;
+                    }
+                    
+                    Console.WriteLine("test");
                     storedPort = line[1];
-                    storedbaudRate = line[4];
-                }
-                catch
+                    storedbaudRate = line[3];
+                    stored_gputemp = line[5];
+                    
+                    
+
+                
+                /*catch
                 {
                     MessageBox.Show("Could Not Retrieve Settings from the config File!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
+                }*/
                 
                 comboBox1.Text = storedPort;
                 comboBox2.Text = storedbaudRate;
+
             }
             {
             }
         }
-
         private void button2_Click(object sender, EventArgs e)
         {
             availableports = SerialPort.GetPortNames();
             comboBox1.Items.Clear();
             comboBox1.Items.AddRange(availableports);
-        }
-
-        private void timer1_Tick(object sender, EventArgs e)
-        {
-
         }
         void updateConfig()
         {
@@ -95,8 +109,10 @@ namespace ardumonitor
             {
                 sw.Write("Port: ");
                 sw.WriteLine(selectedPort);
-                sw.Write("Baud Rate: ");
+                sw.Write("Baud_Rate: ");
                 sw.WriteLine(selectedbaudRate);
+                sw.Write("GPU_Temperature_Enabled: ");
+                sw.WriteLine(selected_gputemp);
             }
         }
         private void label1_Click(object sender, EventArgs e)
@@ -156,7 +172,7 @@ namespace ardumonitor
         {
             while(running == true)
             {
-                Console.WriteLine("abc");
+                Console.WriteLine(selected_gputemp);
             }
         }
         void hshake()
@@ -167,6 +183,17 @@ namespace ardumonitor
             try
             {
                 serial.Open();
+                serial.Write("ready?#");
+                string inData = "";
+                Thread.Sleep(100);
+                inData = serial.ReadTo("#");
+                if (string.Equals(inData, "ready") == true)
+                {
+                    Console.WriteLine("Handshake established");
+                    label5.ForeColor = System.Drawing.Color.Green;
+                    label5.Text = "Established";
+                    backgroundWorker1.RunWorkerAsync();
+                }
             }
             catch
             {
@@ -177,16 +204,26 @@ namespace ardumonitor
                 label5.Text = "Failed";
                 return;
             }
-            serial.Write("ready?#");
-            string inData = "";
-            Thread.Sleep(100);
-            inData = serial.ReadTo("#");
-            if (string.Equals(inData, "ready") == true) {
-                Console.WriteLine("Handshake established");
-                label5.ForeColor = System.Drawing.Color.Green;
-                label5.Text = "Established";
-                backgroundWorker1.RunWorkerAsync();
-            }
+        }
+        private void menuStrip1_ItemClicked(object sender, ToolStripItemClickedEventArgs e)
+        {
+            
+            
+        }
+        private void exitToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Application.Exit();
+        }
+
+        private void settingsToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            
+            sett.ShowDialog();
+        }
+
+        private void sourceCodeToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Process.Start("https://github.com/navidpirsajed/ardumonitor");
         }
     }
 }
