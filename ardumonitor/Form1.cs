@@ -24,32 +24,22 @@ namespace ardumonitor
         String storedPort;
         string selectedbaudRate;
         string storedbaudRate;
-        public string selected_gputemp { get; set; }
-        
-        public string stored_gputemp = "false";
+        string stored_gputemp;
         bool running = false;
-        Settings sett = new Settings();
         public Form1()
         {
             InitializeComponent();
             getAvailablePorts();
             checkconfig();
         }
-        private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            selectedPort = comboBox1.Text;
-            Console.WriteLine("Port: " + selectedPort);
-            if(selectedPort != storedPort)
-            {
-                updateConfig();
-            }
-        }
+
         void getAvailablePorts()
         {
             availableports = SerialPort.GetPortNames();
             comboBox1.Items.Clear();
             comboBox1.Items.AddRange(availableports);
         }
+
         void checkconfig()
         {
             if (!File.Exists(@"config.txt"))
@@ -67,43 +57,68 @@ namespace ardumonitor
             else
             {
                 string lines = System.IO.File.ReadAllText(@"config.txt");
-                string[] line = lines.Split(new char[] { ':', ' ', '\r', '\n'}, StringSplitOptions.RemoveEmptyEntries);
-                /*try
-                {*/
+                string[] line = lines.Split(new char[] { ':', ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                try
+                {
                     int testaaa = 0;
-                    foreach(var a in line)
+                    foreach (var a in line)
                     {
-                        Console.WriteLine(line[testaaa]);
+                        Console.WriteLine("config.txt(" + testaaa + "): " +  line[testaaa]);
                         testaaa++;
                     }
-                    
-                    Console.WriteLine("test");
                     storedPort = line[1];
                     storedbaudRate = line[3];
                     stored_gputemp = line[5];
-                    
-                    
 
-                
-                /*catch
+
+
+                }
+                catch
                 {
                     MessageBox.Show("Could Not Retrieve Settings from the config File!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }*/
-                
+                }
+
                 comboBox1.Text = storedPort;
                 comboBox2.Text = storedbaudRate;
+                //aa
 
             }
             {
             }
         }
-        private void button2_Click(object sender, EventArgs e)
+
+        void hshake()
         {
-            availableports = SerialPort.GetPortNames();
-            comboBox1.Items.Clear();
-            comboBox1.Items.AddRange(availableports);
+            label5.ForeColor = System.Drawing.Color.Green;
+            label5.Text = "Establishing";
+            SerialPort serial = new SerialPort(selectedPort, int.Parse(selectedbaudRate));
+            try
+            {
+                serial.Open();
+                serial.ReadTimeout = 1000;
+                serial.Write("ready?#");
+                string inData = "";
+                inData = serial.ReadTo("#");
+                if (string.Equals(inData, "ready") == true)
+                {
+                    Console.WriteLine("Handshake established");
+                    label5.ForeColor = System.Drawing.Color.Green;
+                    label5.Text = "Established";
+                    backgroundWorker1.RunWorkerAsync();
+                }
+            }
+            catch
+            {
+                serial.Close();
+                MessageBox.Show("Could not open the serial port!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                button1.PerformClick();
+                label5.ForeColor = System.Drawing.Color.Red;
+                label5.Text = "Failed";
+                return;
+            }
         }
-        void updateConfig()
+
+        public void updateConfig()
         {
             using (StreamWriter sw = File.CreateText(@"config.txt"))
             {
@@ -112,9 +127,38 @@ namespace ardumonitor
                 sw.Write("Baud_Rate: ");
                 sw.WriteLine(selectedbaudRate);
                 sw.Write("GPU_Temperature_Enabled: ");
-                sw.WriteLine(selected_gputemp);
+                sw.WriteLine(stored_gputemp);
             }
         }
+
+        private void backgroundWorker1_DoWork(object sender, DoWorkEventArgs e)
+        {
+            while (running == true)
+            {
+                if(stored_gputemp == "true")
+                {
+
+                }
+            }
+        }
+
+        private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            selectedPort = comboBox1.Text;
+            Console.WriteLine("Port: " + selectedPort);
+            if(selectedPort != storedPort)
+            {
+                updateConfig();
+            }
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            availableports = SerialPort.GetPortNames();
+            comboBox1.Items.Clear();
+            comboBox1.Items.AddRange(availableports);
+        }
+
         private void label1_Click(object sender, EventArgs e)
         {
 
@@ -139,6 +183,7 @@ namespace ardumonitor
                 label5.ForeColor = System.Drawing.Color.Red;
                 label5.Text = "Not established";
                 running = false;
+                backgroundWorker1.CancelAsync();
 
             }
             else if(running == false){
@@ -148,6 +193,7 @@ namespace ardumonitor
                 hshake();
             }
         }
+
         private void textBox1_TextChanged(object sender, EventArgs e)
         {
 
@@ -168,62 +214,15 @@ namespace ardumonitor
 
         }
 
-        private void backgroundWorker1_DoWork(object sender, DoWorkEventArgs e)
-        {
-            while(running == true)
-            {
-                Console.WriteLine(selected_gputemp);
-            }
-        }
-        void hshake()
-        {
-            label5.ForeColor = System.Drawing.Color.Green;
-            label5.Text = "Establishing";
-            SerialPort serial = new SerialPort(selectedPort, int.Parse(selectedbaudRate));
-            try
-            {
-                serial.Open();
-                serial.Write("ready?#");
-                string inData = "";
-                Thread.Sleep(100);
-                inData = serial.ReadTo("#");
-                if (string.Equals(inData, "ready") == true)
-                {
-                    Console.WriteLine("Handshake established");
-                    label5.ForeColor = System.Drawing.Color.Green;
-                    label5.Text = "Established";
-                    backgroundWorker1.RunWorkerAsync();
-                }
-            }
-            catch
-            {
-                serial.Close();
-                MessageBox.Show("Could not open the serial port!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                button1.PerformClick();
-                label5.ForeColor = System.Drawing.Color.Red;
-                label5.Text = "Failed";
-                return;
-            }
-        }
         private void menuStrip1_ItemClicked(object sender, ToolStripItemClickedEventArgs e)
         {
             
             
         }
+
         private void exitToolStripMenuItem_Click(object sender, EventArgs e)
         {
             Application.Exit();
-        }
-
-        private void settingsToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            
-            sett.ShowDialog();
-        }
-
-        private void sourceCodeToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            Process.Start("https://github.com/navidpirsajed/ardumonitor");
         }
     }
 }
