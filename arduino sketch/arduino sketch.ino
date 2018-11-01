@@ -1,42 +1,50 @@
 String i;
-#include <UTFTGLUE.h>              //use GLUE class and constructor
-UTFTGLUE myGLCD(0, A2, A1, A3, A4, A0); //all dummy args
-bool hshake_status = false;
+int ii;
+#include <Adafruit_GFX.h>// Hardware-specific library
+#include <MCUFRIEND_kbv.h>
+#include <MemoryFree.h>
+#include <FreeDefaultFonts.h>
+
+MCUFRIEND_kbv tft;
+
+#define LCD_CS A3 // Chip Select goes to Analog 3
+#define LCD_CD A2 // Command/Data goes to Analog 2
+#define LCD_WR A1 // LCD Write goes to Analog 1
+#define LCD_RD A0 // LCD Read goes to Analog 0
+#define LCD_RESET A4 // Can alternately just connect to Arduino's reset pin
+
+#define	BLACK   0x0000
+#define	BLUE    0x001F
+#define	RED     0xF800
+#define	GREEN   0x07E0
+#define CYAN    0x07FF
+#define MAGENTA 0xF81F
+#define YELLOW  0xFFE0
+#define WHITE   0xFFFF
+
 void setup()
 {
-	Serial.begin(9600);
-	pinMode(13, OUTPUT);
-	digitalWrite(13, 0);
-	myGLCD.InitLCD();
-	myGLCD.setFont(SmallFont);
-	myGLCD.fillScr(0, 0, 0);
+    Serial.begin(9600);
+    uint16_t ID = tft.readID();
+    if (ID == 0xD3) ID = 0x9481;
+    tft.begin(ID);
+    tft.setRotation(0);
+    tft.fillScreen(BLACK);
 }
 
 void loop()
 {
-	Serial.println("before");
-	if (hshake_status == false) {
-		hshake();
-	}
-	else
-	{
-		myGLCD.setCursor(50, 50);
-		//myGLCD.setRotation(0);
-		myGLCD.setTextSize(4);
-		myGLCD.println("PEEPEE");
-	}
-}
-
-void hshake() {
-	if (Serial.available() > 0) {
-		i = Serial.readStringUntil('#');
-		if (i == "ready?") {
-			myGLCD.setCursor(0, 0);
-			myGLCD.setTextSize(4);
-			myGLCD.println("Handshake    Established");
-			Serial.write("ready#");
-			hshake_status = true;
-			return;
-		}
-	}
+    if (Serial.available() > 0) {
+        i = Serial.readStringUntil('$');
+        tft.setTextColor(WHITE, BLACK);
+        tft.setTextSize(2);
+        tft.setCursor(0, 0);
+        tft.print(freeMemory());
+        tft.setCursor(70, 0);
+        tft.print(ii);
+        tft.setCursor(0, 25);
+        tft.print(i);
+        ii++;
+    }
+    //myGLCD.fillScr(0, 0, 0);
 }

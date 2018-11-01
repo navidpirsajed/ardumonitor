@@ -13,25 +13,38 @@ using System.Threading;
 using System.Diagnostics;
 using OpenHardwareMonitor.Hardware;
 using System.Text.RegularExpressions;
-
+using System.Security.Principal;
 
 namespace ardumonitor
 {
     public partial class Form1 : Form
     {
+        
         String[] availableports;
         String selectedPort;
         String storedPort;
-        string selectedbaudRate;
+        String selectedbaudRate;
         string storedbaudRate;
         bool running = false;
+        bool isElevated = false;
         public Form1()
         {
+            isadmin();
             InitializeComponent();
             getAvailablePorts();
             checkconfig();
         }
-
+        
+        void isadmin()
+        {
+            using (WindowsIdentity identity = WindowsIdentity.GetCurrent())
+            {
+                WindowsPrincipal principal = new WindowsPrincipal(identity);
+                isElevated = principal.IsInRole(WindowsBuiltInRole.Administrator);
+            }
+            if (!isElevated)
+                MessageBox.Show("Error: " + "Some Features require administrative privileges, please restart the program with elevated rights!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
         void getAvailablePorts()
         {
             availableports = SerialPort.GetPortNames();
@@ -79,37 +92,6 @@ namespace ardumonitor
             }
         }
 
-        void hshake()
-        {
-            label5.ForeColor = System.Drawing.Color.Green;
-            label5.Text = "Establishing";
-            SerialPort serial = new SerialPort(selectedPort, int.Parse(selectedbaudRate));
-            try
-            {
-                serial.Open();
-                serial.ReadTimeout = 1000;
-                serial.Write("ready?#");
-                string inData = "";
-                inData = serial.ReadTo("#");
-                if (string.Equals(inData, "ready") == true)
-                {
-                    Console.WriteLine("Handshake established");
-                    label5.ForeColor = System.Drawing.Color.Green;
-                    label5.Text = "Established";
-                    backgroundWorker1.RunWorkerAsync();
-                }
-            }
-            catch
-            {
-                serial.Close();
-                MessageBox.Show("Could not open the serial port!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                button1.PerformClick();
-                label5.ForeColor = System.Drawing.Color.Red;
-                label5.Text = "Failed";
-                return;
-            }
-        }
-
         public void updateConfig()
         {
             using (StreamWriter sw = File.CreateText(@"config.txt"))
@@ -123,33 +105,69 @@ namespace ardumonitor
 
         private void backgroundWorker1_DoWork(object sender, DoWorkEventArgs e)
         {
-            var GPU_Computer = new Computer();
-            GPU_Computer.GPUEnabled = true;
-            GPU_Computer.Open();
-            foreach (var GPU in GPU_Computer.Hardware)
+            SerialPort serial = new SerialPort(selectedPort, int.Parse(selectedbaudRate));
+            try
             {
-                foreach (var sensor in GPU.Sensors)
+                serial.Open();
+            }catch(Exception exp)
+            {
+                MessageBox.Show("Error: " + exp, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            double /*Temperature*/GPU_Temp = 0, CPU_Temp = 0,/*Load*/ GPU_load = 0, CPU_load = 0,/*Data*/ FreeRam = 0, UsedRam = 0,/*Clock*/ GPU_CoreClock = 0, CPU_Clock1 = 0;
+            Computer c = new Computer();
+            c.GPUEnabled = true;
+            c.CPUEnabled = true;
+            c.RAMEnabled = true;
+            c.Open();
+            while (true)
+            {
+                foreach (var h in c.Hardware)
                 {
-                    if (sensor.SensorType == SensorType.Temperature)
+                    h.Update();
+                    foreach (var s in h.Sensors)
                     {
-                        while (true)
+                        if (s.SensorType == SensorType.Temperature)//Temperature
                         {
-                            if (sensor.Name == "GPU Core")
-                            {
-                                GPU.Update();
-                                Console.WriteLine(sensor.Value.ToString());
-                                Thread.Sleep(1000);
-                            }
+                            if (s.Name == "GPU Core")
+                                GPU_Temp = s.Value.GetValueOrDefault();
+                            if (s.Name == "CPU Package")
+                                CPU_Temp = s.Value.GetValueOrDefault();
+                        }
+                        if (s.SensorType == SensorType.Load)//Load
+                        {
+                            if (s.Name == "GPU Core")
+                                GPU_load = s.Value.GetValueOrDefault();
+                            if (s.Name == "CPU Total")
+                                CPU_load = s.Value.GetValueOrDefault();
+                        }
+                        if (s.SensorType == SensorType.Data)
+                        {
+                            if (s.Name == "Used Memory")
+                                UsedRam = s.Value.GetValueOrDefault();
+                            if (s.Name == "Available Memory")
+                                FreeRam = s.Value.GetValueOrDefault() * 1000;
+                        }
+                        if (s.SensorType == SensorType.Clock)
+                        {
+                            if (s.Name == "GPU Core")
+                                GPU_CoreClock = s.Value.GetValueOrDefault();
+                            if (s.Name == "CPU Core #1")
+                                CPU_Clock1 = s.Value.GetValueOrDefault();
                         }
                     }
                 }
+                //Console.WriteLine("GPU CORE TEMP: " + GPU_Temp.ToString() + " CPU TEMP: " + CPU_Temp + " GPU Load: " + GPU_load + " CPU Load: " + CPU_load.ToString("0.00") + " Free Ram: " + FreeRam.ToString("0") + " GPU core Clock: " + GPU_CoreClock + " CPU Core 1 Clock: " + CPU_Clock1.ToString("0"));
+                try
+                {
+                    serial.Write("#GPU CORE TEMP#" + GPU_Temp.ToString() + "#CPU TEMP#" + CPU_Temp + "#GPU Load#" + GPU_load + "#CPU Load#" + CPU_load.ToString("0.00") + "#Free Ram#" + FreeRam.ToString("0") + "#GPU core Clock#" + GPU_CoreClock + "#CPU Core 1 Clock#" + CPU_Clock1.ToString("0") + "$");
+                }
+                catch (Exception exp)
+                {
+                    MessageBox.Show("Error: " + exp, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    break;
+                }
+                    Thread.Sleep(1000);
             }
-                Console.WriteLine();
-        }
-
-        private void backgroundWorker1_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
-        {
-            backgroundWorker1.RunWorkerAsync();
         }
 
         private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
@@ -188,19 +206,14 @@ namespace ardumonitor
         {
             if (running == true)
             {
-                label4.ForeColor = System.Drawing.Color.Red;
-                label4.Text = "Stopped";
-                label5.ForeColor = System.Drawing.Color.Red;
-                label5.Text = "Not established";
                 running = false;
+                button1.Text = "Connect";
                 backgroundWorker1.CancelAsync();
-
             }
             else if(running == false){
-                label4.ForeColor = System.Drawing.Color.Green;
-                label4.Text = "Running";
                 running = true;
-                hshake();
+                button1.Text = "Disconnect";
+                backgroundWorker1.RunWorkerAsync();
             }
         }
 
@@ -234,5 +247,11 @@ namespace ardumonitor
         {
             Application.Exit();
         }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+
+        }
+
     }
 }
