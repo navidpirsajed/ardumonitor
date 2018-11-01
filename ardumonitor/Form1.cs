@@ -24,7 +24,6 @@ namespace ardumonitor
         String storedPort;
         string selectedbaudRate;
         string storedbaudRate;
-        string stored_gputemp;
         bool running = false;
         public Form1()
         {
@@ -47,11 +46,9 @@ namespace ardumonitor
                 using (StreamWriter sw = File.CreateText(@"config.txt"))
                 {
                     sw.Write("Port: ");
-                    sw.WriteLine("COM");
+                    sw.WriteLine("COM1");
                     sw.Write("Baud_Rate: ");
                     sw.WriteLine("9600");
-                    sw.Write("GPU_Temperature_Enabled: ");
-                    sw.WriteLine("false");
                 }
             }
             else
@@ -60,28 +57,23 @@ namespace ardumonitor
                 string[] line = lines.Split(new char[] { ':', ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
                 try
                 {
-                    int testaaa = 0;
-                    foreach (var a in line)
+                    int index = 0;
+                    foreach (string config in line)
                     {
-                        Console.WriteLine("config.txt(" + testaaa + "): " +  line[testaaa]);
-                        testaaa++;
+                        switch(config){
+                            case "Port": int i = index + 1; storedPort = line[i]; break;
+                            case "Baud_Rate": i = index + 1; storedbaudRate = line[i]; break;
+                        }
+                        Console.WriteLine(index + config);
+                        index++;
                     }
-                    storedPort = line[1];
-                    storedbaudRate = line[3];
-                    stored_gputemp = line[5];
-
-
-
                 }
-                catch
+                catch(Exception exp)
                 {
-                    MessageBox.Show("Could Not Retrieve Settings from the config File!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show("Error: " + exp, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
-
                 comboBox1.Text = storedPort;
                 comboBox2.Text = storedbaudRate;
-                //aa
-
             }
             {
             }
@@ -126,20 +118,38 @@ namespace ardumonitor
                 sw.WriteLine(selectedPort);
                 sw.Write("Baud_Rate: ");
                 sw.WriteLine(selectedbaudRate);
-                sw.Write("GPU_Temperature_Enabled: ");
-                sw.WriteLine(stored_gputemp);
             }
         }
 
         private void backgroundWorker1_DoWork(object sender, DoWorkEventArgs e)
         {
-            while (running == true)
+            var GPU_Computer = new Computer();
+            GPU_Computer.GPUEnabled = true;
+            GPU_Computer.Open();
+            foreach (var GPU in GPU_Computer.Hardware)
             {
-                if(stored_gputemp == "true")
+                foreach (var sensor in GPU.Sensors)
                 {
-
+                    if (sensor.SensorType == SensorType.Temperature)
+                    {
+                        while (true)
+                        {
+                            if (sensor.Name == "GPU Core")
+                            {
+                                GPU.Update();
+                                Console.WriteLine(sensor.Value.ToString());
+                                Thread.Sleep(1000);
+                            }
+                        }
+                    }
                 }
             }
+                Console.WriteLine();
+        }
+
+        private void backgroundWorker1_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            backgroundWorker1.RunWorkerAsync();
         }
 
         private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
