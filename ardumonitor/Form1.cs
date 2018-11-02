@@ -119,7 +119,15 @@ namespace ardumonitor
             c.CPUEnabled = true;
             c.RAMEnabled = true;
             c.Open();
-            while (true)
+            bool io = true;
+            string inData;
+            while (!io)
+            {
+                inData = serial.ReadTo("$");
+                if (inData == "H") io = true;
+                Console.WriteLine("dsaasas" + inData);
+            }
+            while (io)
             {
                 foreach (var h in c.Hardware)
                 {
@@ -156,7 +164,7 @@ namespace ardumonitor
                         }
                     }
                 }
-                //Console.WriteLine("GPU CORE TEMP: " + GPU_Temp.ToString() + " CPU TEMP: " + CPU_Temp + " GPU Load: " + GPU_load + " CPU Load: " + CPU_load.ToString("0.00") + " Free Ram: " + FreeRam.ToString("0") + " GPU core Clock: " + GPU_CoreClock + " CPU Core 1 Clock: " + CPU_Clock1.ToString("0"));
+                Console.WriteLine("GPU CORE TEMP: " + GPU_Temp.ToString() + " CPU TEMP: " + CPU_Temp + " GPU Load: " + GPU_load + " CPU Load: " + CPU_load.ToString("0.00") + " Free Ram: " + FreeRam.ToString("0") + " GPU core Clock: " + GPU_CoreClock + " CPU Core 1 Clock: " + CPU_Clock1.ToString("0"));
                 try
                 {
                     serial.Write("#GPU CORE TEMP#" + GPU_Temp.ToString() + "#CPU TEMP#" + CPU_Temp + "#GPU Load#" + GPU_load + "#CPU Load#" + CPU_load.ToString("0.00") + "#Free Ram#" + FreeRam.ToString("0") + "#GPU core Clock#" + GPU_CoreClock + "#CPU Core 1 Clock#" + CPU_Clock1.ToString("0") + "$");
@@ -167,6 +175,7 @@ namespace ardumonitor
                     break;
                 }
                     Thread.Sleep(1000);
+                io = false;
             }
         }
 

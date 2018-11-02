@@ -44,7 +44,9 @@ void loop()
         tft.print(ii);
         tft.setCursor(0, 25);
         tft.print(i);
+        
         ii++;
     }
+    Serial.write("H$");
     //myGLCD.fillScr(0, 0, 0);
 }
